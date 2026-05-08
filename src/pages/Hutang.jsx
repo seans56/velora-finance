@@ -4,43 +4,20 @@ import { supabase } from '../lib/supabase'
 const fmt = (n) => 'Rp ' + (Number(n)||0).toLocaleString('id-ID')
 const fmtNum = (raw) => raw.replace(/[^0-9]/g,'')
 
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
+const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events'
+
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap');
   .vf-root { font-family: 'DM Sans', sans-serif; }
-  .vf-card {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 20px;
-    padding: 18px;
-    margin-bottom: 14px;
-  }
-  .vf-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 6px;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    border-radius: 8px;
-    transition: background 0.15s;
-  }
-  .vf-row:last-child { border-bottom: none; }
-  .vf-row:hover { background: rgba(255,255,255,0.03); }
-  .vf-input {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.1);
-    color: #fff;
-    border-radius: 10px;
-    padding: 10px 12px;
-    font-size: 13px;
-    width: 100%;
-    box-sizing: border-box;
-    font-family: 'DM Sans', sans-serif;
-    outline: none;
-    transition: border-color 0.2s;
-  }
-  .vf-input:focus { border-color: rgba(74,158,255,0.5); }
-  .vf-input option { background: #0d1828; }
-  .vf-btn-green { background: linear-gradient(135deg,#00c853,#00a844); color:#000; border:none; padding:10px 18px; border-radius:10px; font-size:13px; font-weight:600; cursor:pointer; font-family:'DM Sans',sans-serif; transition:opacity 0.2s; }
+  .vf-card { background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); border-radius:20px; padding:18px; margin-bottom:14px; }
+  .vf-row { display:flex; justify-content:space-between; align-items:center; padding:10px 6px; border-bottom:1px solid rgba(255,255,255,0.05); border-radius:8px; transition:background 0.15s; }
+  .vf-row:last-child { border-bottom:none; }
+  .vf-row:hover { background:rgba(255,255,255,0.03); }
+  .vf-input { background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#fff; border-radius:10px; padding:10px 12px; font-size:13px; width:100%; box-sizing:border-box; font-family:'DM Sans',sans-serif; outline:none; transition:border-color 0.2s; }
+  .vf-input:focus { border-color:rgba(74,158,255,0.5); }
+  .vf-input option { background:#0d1828; }
+  .vf-btn-green { background:linear-gradient(135deg,#00c853,#00a844); color:#000; border:none; padding:10px 18px; border-radius:10px; font-size:13px; font-weight:600; cursor:pointer; font-family:'DM Sans',sans-serif; transition:opacity 0.2s; }
   .vf-btn-green:hover { opacity:0.85; }
   .vf-btn-blue { background:rgba(74,158,255,0.12); color:#4a9eff; border:1px solid rgba(74,158,255,0.25); padding:9px 14px; border-radius:10px; font-size:12px; font-weight:500; cursor:pointer; font-family:'DM Sans',sans-serif; transition:background 0.2s; }
   .vf-btn-blue:hover { background:rgba(74,158,255,0.22); }
@@ -48,6 +25,9 @@ const css = `
   .vf-btn-red:hover { background:rgba(255,100,100,0.2); }
   .vf-btn-orange { background:rgba(255,152,0,0.12); color:#ffa726; border:1px solid rgba(255,152,0,0.25); padding:9px 14px; border-radius:10px; font-size:12px; font-weight:500; cursor:pointer; font-family:'DM Sans',sans-serif; transition:background 0.2s; }
   .vf-btn-orange:hover { background:rgba(255,152,0,0.22); }
+  .vf-btn-gcal { background:rgba(66,133,244,0.12); color:#4285f4; border:1px solid rgba(66,133,244,0.25); padding:5px 10px; border-radius:8px; font-size:11px; cursor:pointer; font-family:'DM Sans',sans-serif; transition:background 0.2s; }
+  .vf-btn-gcal:hover { background:rgba(66,133,244,0.22); }
+  .vf-btn-gcal:disabled { opacity:0.5; cursor:not-allowed; }
   .vf-tab { padding:8px 16px; border-radius:10px; font-size:12px; cursor:pointer; border:1px solid rgba(255,255,255,0.07); background:transparent; color:#4a6a8a; font-family:'DM Sans',sans-serif; transition:all 0.2s; }
   .vf-tab:hover { color:#c8d8f0; border-color:rgba(255,255,255,0.15); }
   .vf-tab.active { background:rgba(74,158,255,0.12); color:#4a9eff; border-color:rgba(74,158,255,0.3); }
@@ -59,6 +39,8 @@ const css = `
   .vf-fadein { animation:fadeUp 0.35s ease forwards; }
   .vf-progress { width:100%; background:rgba(255,255,255,0.06); border-radius:6px; height:5px; margin-top:6px; overflow:hidden; }
   .vf-progress-bar { height:100%; border-radius:6px; background:linear-gradient(90deg,#00c853,#4cde8a); transition:width 0.6s ease; }
+  .gcal-banner { background:rgba(66,133,244,0.08); border:1px solid rgba(66,133,244,0.2); border-radius:14px; padding:12px 16px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .gcal-success { background:rgba(0,200,83,0.08); border:1px solid rgba(0,200,83,0.2); border-radius:10px; padding:10px 14px; font-size:12px; color:#4cde8a; margin-bottom:14px; }
 `
 
 const hutangAwal = [
@@ -74,8 +56,15 @@ const hutangAwal = [
 const EMPTY_HUTANG = { nama:'', tipe:'Pinjol', currency:'IDR', total_awal:0, sisa:0, cicilan_per_bulan:0, jatuh_tempo:'' }
 const EMPTY_BAYAR = { hutang_id:'', rekening_id:'', tanggal:'', jumlah:0, catatan:'' }
 const EMPTY_TRANSFER = { dari_rekening_id:'', ke_rekening_id:'', tanggal:'', jumlah:0, catatan:'' }
-
 const TIPE_COLOR = { Pinjol:'#ff6464', Personal:'#4a9eff', 'Kartu Kredit':'#b464ff', Cicilan:'#ffa726' }
+
+const loadGoogleScript = () => new Promise((resolve) => {
+  if (window.google?.accounts) { resolve(); return }
+  const script = document.createElement('script')
+  script.src = 'https://accounts.google.com/gsi/client'
+  script.onload = resolve
+  document.head.appendChild(script)
+})
 
 export default function Hutang() {
   const [tab, setTab] = useState('hutang')
@@ -84,6 +73,9 @@ export default function Hutang() {
   const [riwayat, setRiwayat] = useState([])
   const [transferList, setTransferList] = useState([])
   const [loading, setLoading] = useState(true)
+  const [googleToken, setGoogleToken] = useState(null)
+  const [calendarLoading, setCalendarLoading] = useState(false)
+  const [calendarSuccess, setCalendarSuccess] = useState('')
 
   const [showBayar, setShowBayar] = useState(false)
   const [showTransfer, setShowTransfer] = useState(false)
@@ -115,10 +107,80 @@ export default function Hutang() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); loadGoogleScript() }, [])
 
   const totalHutang = hutangList.reduce((s,h) => s+Number(h.sisa), 0)
   const totalRekening = rekening.reduce((s,r) => s+Number(r.saldo), 0)
+  const hutangDenganTempo = hutangList.filter(h => h.jatuh_tempo && h.status !== 'lunas')
+
+  const loginGoogle = () => new Promise((resolve, reject) => {
+    const client = window.google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: CALENDAR_SCOPE,
+      callback: (res) => {
+        if (res.error) { reject(res.error); return }
+        setGoogleToken(res.access_token)
+        resolve(res.access_token)
+      }
+    })
+    client.requestAccessToken()
+  })
+
+  const buatEvent = async (hutang, token) => {
+    const event = {
+      summary: `💸 Bayar ${hutang.nama} — ${fmt(hutang.cicilan_per_bulan || hutang.sisa)}`,
+      description: `Reminder cicilan dari Velora Finance.\nNama: ${hutang.nama}\nTipe: ${hutang.tipe}\nSisa: ${fmt(hutang.sisa)}\nCicilan: ${fmt(hutang.cicilan_per_bulan)}/bln`,
+      start: { date: hutang.jatuh_tempo },
+      end: { date: hutang.jatuh_tempo },
+      reminders: {
+        useDefault: false,
+        overrides: [
+          { method: 'popup', minutes: 1440 },
+          { method: 'popup', minutes: 60 },
+          { method: 'email', minutes: 1440 },
+        ]
+      },
+      colorId: '11'
+    }
+    return fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(event)
+    })
+  }
+
+  const tambahSatuKeCalendar = async (hutang) => {
+    if (!hutang.jatuh_tempo) { alert('Hutang ini tidak punya jatuh tempo!'); return }
+    setCalendarLoading(true)
+    try {
+      let token = googleToken || await loginGoogle()
+      const res = await buatEvent(hutang, token)
+      if (res.ok) {
+        setCalendarSuccess(`✅ ${hutang.nama} berhasil ditambahkan ke Google Calendar!`)
+        setTimeout(() => setCalendarSuccess(''), 4000)
+      } else {
+        const err = await res.json()
+        alert('Gagal: ' + err.error?.message)
+      }
+    } catch(e) { alert('Error: ' + e.message) }
+    setCalendarLoading(false)
+  }
+
+  const tambahSemuaKeCalendar = async () => {
+    if (hutangDenganTempo.length === 0) { alert('Tidak ada hutang dengan jatuh tempo!'); return }
+    setCalendarLoading(true)
+    try {
+      let token = googleToken || await loginGoogle()
+      let berhasil = 0
+      for (const h of hutangDenganTempo) {
+        const res = await buatEvent(h, token)
+        if (res.ok) berhasil++
+      }
+      setCalendarSuccess(`✅ ${berhasil} hutang berhasil ditambahkan ke Google Calendar!`)
+      setTimeout(() => setCalendarSuccess(''), 5000)
+    } catch(e) { alert('Error: ' + e.message) }
+    setCalendarLoading(false)
+  }
 
   const importData = async () => {
     const { data:{ user } } = await supabase.auth.getUser()
@@ -196,7 +258,6 @@ export default function Hutang() {
       <style>{css}</style>
       <div className="vf-root" style={{ padding:'24px 20px', background:'#080c14', minHeight:'100vh', color:'#fff' }}>
 
-        {/* HEADER */}
         <div className="vf-fadein" style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'24px' }}>
           <div>
             <div style={{ fontSize:'11px', color:'#4a6a8a', letterSpacing:'0.08em', marginBottom:'4px' }}>KEUANGAN</div>
@@ -209,8 +270,7 @@ export default function Hutang() {
           </div>
         </div>
 
-        {/* KPI */}
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'20px' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'16px' }}>
           <div style={{ background:'linear-gradient(135deg,#1a0808,#1a0a0a)', border:'1px solid rgba(255,100,100,0.2)', borderRadius:'16px', padding:'16px' }}>
             <div style={{ fontSize:'10px', color:'#4a6a8a', letterSpacing:'0.08em', marginBottom:'6px' }}>TOTAL HUTANG</div>
             <div style={{ fontFamily:'DM Serif Display,serif', fontSize:'20px', color:'#ff6464' }}>{fmt(totalHutang)}</div>
@@ -221,16 +281,28 @@ export default function Hutang() {
           </div>
         </div>
 
-        {/* TABS */}
+        {/* GOOGLE CALENDAR BANNER */}
+        {tab === 'hutang' && hutangDenganTempo.length > 0 && (
+          <div className="gcal-banner">
+            <div>
+              <div style={{ fontSize:'13px', color:'#4a9eff', fontWeight:'500' }}>📅 Sinkron ke Google Calendar</div>
+              <div style={{ fontSize:'10px', color:'#4a6a8a', marginTop:'2px' }}>{hutangDenganTempo.length} hutang punya jatuh tempo · reminder popup + email otomatis</div>
+            </div>
+            <button className="vf-btn-gcal" onClick={tambahSemuaKeCalendar} disabled={calendarLoading}
+              style={{ padding:'8px 14px', fontSize:'12px', borderRadius:'10px', whiteSpace:'nowrap' }}>
+              {calendarLoading ? '⏳ Menambahkan...' : '📅 Tambah Semua'}
+            </button>
+          </div>
+        )}
+
+        {calendarSuccess && <div className="gcal-success">{calendarSuccess}</div>}
+
         <div style={{ display:'flex', gap:'8px', marginBottom:'20px', flexWrap:'wrap' }}>
           {TABS.map(t => (
-            <button key={t.key} className={`vf-tab${tab===t.key?' active':''}`} onClick={() => setTab(t.key)}>
-              {t.label}
-            </button>
+            <button key={t.key} className={`vf-tab${tab===t.key?' active':''}`} onClick={() => setTab(t.key)}>{t.label}</button>
           ))}
         </div>
 
-        {/* DAFTAR HUTANG */}
         {tab === 'hutang' && (
           <div className="vf-card">
             {hutangList.length === 0 ? (
@@ -246,20 +318,22 @@ export default function Hutang() {
                 <div key={h.id} style={{ padding:'14px 6px', borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'8px' }}>
                     <div style={{ flex:1 }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'4px' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'4px', flexWrap:'wrap' }}>
                         <span style={{ fontSize:'14px', fontWeight:'600', color:'#e8f0fe' }}>{h.nama}</span>
                         <span style={{ fontSize:'10px', padding:'2px 8px', borderRadius:'20px', background:`${tipeColor}18`, color:tipeColor, border:`1px solid ${tipeColor}33` }}>{h.tipe}</span>
                         <span style={{ fontSize:'10px', padding:'2px 8px', borderRadius:'20px', background:h.status==='lunas'?'rgba(0,200,83,0.1)':'rgba(255,100,100,0.1)', color:h.status==='lunas'?'#4cde8a':'#ff6464', border:`1px solid ${h.status==='lunas'?'rgba(0,200,83,0.2)':'rgba(255,100,100,0.2)'}` }}>{h.status}</span>
                       </div>
                       <div style={{ fontSize:'11px', color:'#4a6a8a' }}>
                         Sisa <span style={{ color:'#ff6464', fontWeight:'600' }}>{fmt(h.sisa)}</span>
-                        <span style={{ margin:'0 6px', opacity:0.4 }}>·</span>
-                        dari {fmt(h.total_awal)}
+                        <span style={{ margin:'0 6px', opacity:0.4 }}>·</span>dari {fmt(h.total_awal)}
                         {h.cicilan_per_bulan > 0 && <><span style={{ margin:'0 6px', opacity:0.4 }}>·</span><span style={{ color:'#ffa726' }}>{fmt(h.cicilan_per_bulan)}/bln</span></>}
                         {h.jatuh_tempo && <><span style={{ margin:'0 6px', opacity:0.4 }}>·</span><span style={{ color:'#4a6a8a' }}>⏰ {h.jatuh_tempo}</span></>}
                       </div>
                     </div>
-                    <div style={{ display:'flex', gap:'6px', marginLeft:'10px' }}>
+                    <div style={{ display:'flex', gap:'6px', marginLeft:'10px', flexWrap:'wrap', justifyContent:'flex-end' }}>
+                      {h.jatuh_tempo && h.status !== 'lunas' && (
+                        <button className="vf-btn-gcal" onClick={() => tambahSatuKeCalendar(h)} disabled={calendarLoading} title="Tambah ke Google Calendar">📅</button>
+                      )}
                       <button className="vf-btn-blue" style={{ padding:'5px 10px', fontSize:'11px' }} onClick={() => {
                         setEditForm({...h})
                         setDispEdit({ total_awal:Number(h.total_awal).toLocaleString('id-ID'), sisa:Number(h.sisa).toLocaleString('id-ID'), cicilan_per_bulan:Number(h.cicilan_per_bulan).toLocaleString('id-ID') })
@@ -280,21 +354,17 @@ export default function Hutang() {
           </div>
         )}
 
-        {/* RIWAYAT BAYAR */}
         {tab === 'riwayat_bayar' && (
           <div className="vf-card">
             <div style={{ fontSize:'12px', fontWeight:'600', color:'#c8d8f0', letterSpacing:'0.04em', marginBottom:'14px' }}>RIWAYAT PEMBAYARAN</div>
-            {riwayat.length === 0
-              ? <div style={{ color:'#3a5a7a', fontSize:'12px', padding:'12px 0' }}>Belum ada pembayaran</div>
+            {riwayat.length === 0 ? <div style={{ color:'#3a5a7a', fontSize:'12px', padding:'12px 0' }}>Belum ada pembayaran</div>
               : riwayat.map(p => (
                 <div key={p.id} className="vf-row">
                   <div style={{ display:'flex', alignItems:'center', gap:'10px', flex:1 }}>
                     <div style={{ width:'8px', height:'8px', borderRadius:'50%', background:'#ff6464', flexShrink:0 }} />
                     <div>
                       <div style={{ fontSize:'13px', color:'#c8d8f0', fontWeight:'500' }}>{p.hutang?.nama}</div>
-                      <div style={{ fontSize:'10px', color:'#3a5a7a', marginTop:'1px' }}>
-                        {p.tanggal} · dari {p.rekening?.nama||'manual'}{p.catatan&&' · '+p.catatan}
-                      </div>
+                      <div style={{ fontSize:'10px', color:'#3a5a7a', marginTop:'1px' }}>{p.tanggal} · dari {p.rekening?.nama||'manual'}{p.catatan&&' · '+p.catatan}</div>
                     </div>
                   </div>
                   <div style={{ fontSize:'13px', fontWeight:'600', color:'#ff6464' }}>{fmt(p.jumlah)}</div>
@@ -304,12 +374,10 @@ export default function Hutang() {
           </div>
         )}
 
-        {/* TRANSFER */}
         {tab === 'transfer' && (
           <div className="vf-card">
             <div style={{ fontSize:'12px', fontWeight:'600', color:'#c8d8f0', letterSpacing:'0.04em', marginBottom:'14px' }}>RIWAYAT TRANSFER</div>
-            {transferList.length === 0
-              ? <div style={{ color:'#3a5a7a', fontSize:'12px', padding:'12px 0' }}>Belum ada transfer</div>
+            {transferList.length === 0 ? <div style={{ color:'#3a5a7a', fontSize:'12px', padding:'12px 0' }}>Belum ada transfer</div>
               : transferList.map(t => (
                 <div key={t.id} className="vf-row">
                   <div style={{ display:'flex', alignItems:'center', gap:'10px', flex:1 }}>
@@ -326,7 +394,6 @@ export default function Hutang() {
           </div>
         )}
 
-        {/* WALLET */}
         {tab === 'wallet' && (
           <div className="vf-card">
             <div style={{ fontSize:'12px', fontWeight:'600', color:'#c8d8f0', letterSpacing:'0.04em', marginBottom:'14px' }}>SALDO WALLET</div>
@@ -345,25 +412,12 @@ export default function Hutang() {
           </div>
         )}
 
-        {/* MODAL BAYAR */}
         {showBayar && (
           <div className="vf-modal" onClick={() => setShowBayar(false)}>
             <div className="vf-modal-box" onClick={e=>e.stopPropagation()}>
               <div style={{ fontFamily:'DM Serif Display,serif', fontSize:'18px', color:'#e8f0fe', marginBottom:'20px' }}>Bayar Hutang</div>
-              <div style={{ marginBottom:'12px' }}>
-                <div className="vf-label">PILIH HUTANG</div>
-                <select className="vf-input" value={bayarForm.hutang_id} onChange={e=>setBayarForm({...bayarForm,hutang_id:e.target.value})}>
-                  <option value=''>-- Pilih hutang --</option>
-                  {hutangList.filter(h=>h.status!=='lunas').map(h=><option key={h.id} value={h.id}>{h.nama} — sisa {fmt(h.sisa)}</option>)}
-                </select>
-              </div>
-              <div style={{ marginBottom:'12px' }}>
-                <div className="vf-label">BAYAR DARI WALLET</div>
-                <select className="vf-input" value={bayarForm.rekening_id} onChange={e=>setBayarForm({...bayarForm,rekening_id:e.target.value})}>
-                  <option value=''>-- Pilih wallet (opsional) --</option>
-                  {rekening.map(r=><option key={r.id} value={r.id}>{r.nama} — {fmt(r.saldo)}</option>)}
-                </select>
-              </div>
+              <div style={{ marginBottom:'12px' }}><div className="vf-label">PILIH HUTANG</div><select className="vf-input" value={bayarForm.hutang_id} onChange={e=>setBayarForm({...bayarForm,hutang_id:e.target.value})}><option value=''>-- Pilih hutang --</option>{hutangList.filter(h=>h.status!=='lunas').map(h=><option key={h.id} value={h.id}>{h.nama} — sisa {fmt(h.sisa)}</option>)}</select></div>
+              <div style={{ marginBottom:'12px' }}><div className="vf-label">BAYAR DARI WALLET</div><select className="vf-input" value={bayarForm.rekening_id} onChange={e=>setBayarForm({...bayarForm,rekening_id:e.target.value})}><option value=''>-- Pilih wallet (opsional) --</option>{rekening.map(r=><option key={r.id} value={r.id}>{r.nama} — {fmt(r.saldo)}</option>)}</select></div>
               <div className="vf-grid2">
                 <div><div className="vf-label">TANGGAL</div><input className="vf-input" type='date' value={bayarForm.tanggal} onChange={e=>setBayarForm({...bayarForm,tanggal:e.target.value})}/></div>
                 <div><div className="vf-label">JUMLAH</div><input className="vf-input" value={dispBayar} onChange={e=>{const n=Number(fmtNum(e.target.value))||0;setBayarForm(f=>({...f,jumlah:n}));setDispBayar(n?n.toLocaleString('id-ID'):'')}} placeholder='0'/></div>
@@ -377,7 +431,6 @@ export default function Hutang() {
           </div>
         )}
 
-        {/* MODAL TRANSFER */}
         {showTransfer && (
           <div className="vf-modal" onClick={() => setShowTransfer(false)}>
             <div className="vf-modal-box" onClick={e=>e.stopPropagation()}>
@@ -397,7 +450,6 @@ export default function Hutang() {
           </div>
         )}
 
-        {/* MODAL EDIT HUTANG */}
         {showEditHutang && editForm && (
           <div className="vf-modal" onClick={() => setShowEditHutang(false)}>
             <div className="vf-modal-box" onClick={e=>e.stopPropagation()}>
@@ -423,7 +475,6 @@ export default function Hutang() {
           </div>
         )}
 
-        {/* MODAL TAMBAH HUTANG */}
         {showTambah && (
           <div className="vf-modal" onClick={() => setShowTambah(false)}>
             <div className="vf-modal-box" onClick={e=>e.stopPropagation()}>
