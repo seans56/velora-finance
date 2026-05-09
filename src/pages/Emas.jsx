@@ -66,6 +66,8 @@ export default function Emas() {
   const [hargaHariIni, setHargaHariIni] = useState(null)
   const [loadingHarga, setLoadingHarga] = useState(false)
   const [grafikData, setGrafikData] = useState([])
+  const [lastUpdate, setLastUpdate] = useState(null)
+  const [sumber, setSumber] = useState('')
 
   const refetch = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -84,11 +86,33 @@ export default function Emas() {
 
   const fetchHargaEmas = async () => {
     setLoadingHarga(true)
-    setHargaHariIni(2633000)
+    try {
+      // Coba CoinGecko dulu
+      const res = await fetch(
+        'https://api.coingecko.com/api/v3/simple/price?ids=gold&vs_currencies=idr'
+      )
+      const data = await res.json()
+      if (data?.gold?.idr) {
+        // 1 troy oz = 31.1035 gram
+        const perGram = Math.round(data.gold.idr / 31.1035)
+        setHargaHariIni(perGram)
+        setLastUpdate(new Date().toLocaleTimeString('id-ID'))
+        setSumber('CoinGecko · Live')
+      } else {
+        throw new Error('No data')
+      }
+    } catch {
+      // Fallback ke harga manual
+      setHargaHariIni(2633000)
+      setSumber('Estimasi manual')
+    }
     setLoadingHarga(false)
   }
 
-  useEffect(() => { refetch(); fetchHargaEmas() }, [])
+  useEffect(() => {
+    refetch()
+    fetchHargaEmas()
+  }, [])
 
   const totalGram = list.reduce((s, r) => s + Number(r.berat_gram || 0), 0)
   const totalNilaiModal = list.reduce((s, r) => s + Number(r.berat_gram || 0) * Number(r.harga_beli_per_gram || 0), 0)
@@ -128,10 +152,6 @@ export default function Emas() {
             <div style={{ fontSize:'11px', color:'#4a6a8a', letterSpacing:'0.08em', marginBottom:'4px' }}>INVESTASI</div>
             <div style={{ fontFamily:'DM Serif Display,serif', fontSize:'22px', color:'#e8f0fe' }}>Portofolio Emas</div>
           </div>
-          <button onClick={fetchHargaEmas} disabled={loadingHarga}
-            style={{ background:'rgba(245,200,66,0.1)', color:'#f5c842', border:'1px solid rgba(245,200,66,0.2)', padding:'8px 14px', borderRadius:'10px', fontSize:'12px', cursor:'pointer', fontFamily:'DM Sans,sans-serif' }}>
-            🔄 Refresh Harga
-          </button>
         </div>
 
         {/* KPI */}
@@ -153,12 +173,22 @@ export default function Emas() {
         {/* HARGA HARI INI */}
         <div className="vf-card" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', border:'1px solid rgba(245,200,66,0.12)' }}>
           <div>
-            <div style={{ fontSize:'10px', color:'#4a6a8a', letterSpacing:'0.08em', marginBottom:'4px' }}>HARGA EMAS /GRAM (ESTIMASI)</div>
-            <div style={{ fontSize:'18px', fontWeight:'600', color:'#f5c842' }}>
+            <div style={{ fontSize:'10px', color:'#4a6a8a', letterSpacing:'0.08em', marginBottom:'4px' }}>HARGA EMAS /GRAM</div>
+            <div style={{ fontSize:'20px', fontWeight:'700', color:'#f5c842' }}>
               {loadingHarga ? 'Memuat...' : hargaHariIni ? fmtRp(hargaHariIni) : '-'}
             </div>
+            <div style={{ fontSize:'10px', color:'#4a6a8a', marginTop:'4px' }}>
+              {sumber && <span style={{ color:'#4cde8a' }}>● {sumber}</span>}
+              {lastUpdate && <span style={{ marginLeft:'6px' }}>· {lastUpdate}</span>}
+            </div>
           </div>
-          <div style={{ fontSize:'24px' }}>🥇</div>
+          <button
+            onClick={fetchHargaEmas}
+            disabled={loadingHarga}
+            style={{ background:'rgba(245,200,66,0.1)', color:'#f5c842', border:'1px solid rgba(245,200,66,0.2)', padding:'8px 14px', borderRadius:'10px', fontSize:'12px', cursor:'pointer', fontFamily:'DM Sans,sans-serif' }}
+          >
+            {loadingHarga ? '⏳' : '🔄'} Refresh
+          </button>
         </div>
 
         {/* GRAFIK */}
@@ -171,20 +201,24 @@ export default function Emas() {
         <div className="vf-card">
           <div style={{ fontSize:'12px', fontWeight:'600', color:'#c8d8f0', letterSpacing:'0.04em', marginBottom:'16px' }}>➕ CATAT PEMBELIAN</div>
           <div className="vf-grid2">
-            <div><div className="vf-label">PLATFORM</div>
+            <div>
+              <div className="vf-label">PLATFORM</div>
               <select className="vf-input" value={form.platform} onChange={e => setForm({...form, platform:e.target.value})}>
                 {PLATFORMS.map(p => <option key={p}>{p}</option>)}
               </select>
             </div>
-            <div><div className="vf-label">TANGGAL BELI</div>
+            <div>
+              <div className="vf-label">TANGGAL BELI</div>
               <input type="date" className="vf-input" value={form.tanggal} onChange={e => setForm({...form, tanggal:e.target.value})} />
             </div>
           </div>
           <div className="vf-grid2">
-            <div><div className="vf-label">JUMLAH (GRAM)</div>
+            <div>
+              <div className="vf-label">JUMLAH (GRAM)</div>
               <input className="vf-input" value={form.gram} onChange={e => setForm({...form, gram:e.target.value})} placeholder="0.5" />
             </div>
-            <div><div className="vf-label">HARGA BELI /GRAM (RP)</div>
+            <div>
+              <div className="vf-label">HARGA BELI /GRAM (RP)</div>
               <input className="vf-input" value={form.harga_beli} onChange={e => setForm({...form, harga_beli:e.target.value})} placeholder="2633000" />
             </div>
           </div>
