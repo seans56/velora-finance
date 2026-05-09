@@ -11,72 +11,6 @@ const fmtByCurrency = (n, currency='IDR') => {
   return sym + num.toLocaleString('id-ID')
 }
 
-const css = `
-  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap');
-
-  .vf-root { font-family: 'DM Sans', sans-serif; }
-
-  .vf-card {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 20px;
-    padding: 20px;
-    margin-bottom: 14px;
-    backdrop-filter: blur(10px);
-    transition: border-color 0.2s, transform 0.2s;
-  }
-  .vf-card:hover { border-color: rgba(255,255,255,0.13); }
-
-  .vf-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    transition: background 0.15s;
-  }
-  .vf-row:last-child { border-bottom: none; }
-  .vf-row:hover { background: rgba(255,255,255,0.02); border-radius: 8px; padding-left: 6px; padding-right: 6px; }
-
-  .vf-badge {
-    font-size: 10px;
-    padding: 2px 8px;
-    border-radius: 20px;
-    font-weight: 500;
-    letter-spacing: 0.02em;
-  }
-
-  .vf-kpi {
-    border-radius: 16px;
-    padding: 16px;
-    position: relative;
-    overflow: hidden;
-    transition: transform 0.2s;
-  }
-  .vf-kpi:hover { transform: translateY(-2px); }
-  .vf-kpi::after {
-    content: '';
-    position: absolute;
-    top: -30px; right: -30px;
-    width: 80px; height: 80px;
-    border-radius: 50%;
-    opacity: 0.08;
-  }
-
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(16px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  .vf-fadein { animation: fadeUp 0.4s ease forwards; }
-  .vf-fadein-1 { animation-delay: 0.05s; opacity: 0; }
-  .vf-fadein-2 { animation-delay: 0.1s; opacity: 0; }
-  .vf-fadein-3 { animation-delay: 0.15s; opacity: 0; }
-  .vf-fadein-4 { animation-delay: 0.2s; opacity: 0; }
-  .vf-fadein-5 { animation-delay: 0.25s; opacity: 0; }
-  .vf-fadein-6 { animation-delay: 0.3s; opacity: 0; }
-  .vf-fadein-7 { animation-delay: 0.35s; opacity: 0; }
-`
-
 export default function Dashboard() {
   const [user, setUser] = useState(null)
   const [hutang, setHutang] = useState([])
@@ -84,7 +18,7 @@ export default function Dashboard() {
   const [crypto, setCrypto] = useState([])
   const [emas, setEmas] = useState([])
   const [hargaLive, setHargaLive] = useState({})
-  const [hargaEmas] = useState(2633000)
+  const [hargaEmas, setHargaEmas] = useState(2633000)
   const [loading, setLoading] = useState(true)
 
   const TICKER_TO_ID = {
@@ -108,6 +42,7 @@ export default function Dashboard() {
       setCrypto(c || [])
       setEmas(e || [])
       if (c && c.length > 0) fetchHargaCrypto(c)
+      fetchHargaEmas()
       setLoading(false)
     }
     init()
@@ -115,7 +50,11 @@ export default function Dashboard() {
 
   const fetchHargaCrypto = async (coinList) => {
     try {
-      const ids = [...new Set(coinList.map(c => TICKER_TO_ID[c.ticker.toUpperCase()]).filter(Boolean))].join(',')
+      const ids = [...new Set(
+        coinList
+          .map(c => TICKER_TO_ID[c.ticker.toUpperCase()])
+          .filter(Boolean)
+      )].join(',')
       if (!ids) return
       const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=idr`)
       const data = await res.json()
@@ -123,8 +62,24 @@ export default function Dashboard() {
     } catch(e) {}
   }
 
+  const fetchHargaEmas = async () => {
+    try {
+      const res = await fetch(
+        'https://api.coingecko.com/api/v3/simple/price?ids=gold&vs_currencies=idr'
+      )
+      const data = await res.json()
+      if (data?.gold?.idr) {
+        // 1 troy oz = 31.1035 gram
+        const perGram = Math.round(data.gold.idr / 31.1035)
+        setHargaEmas(perGram)
+      }
+    } catch {}
+  }
+
   const totalHutang = hutang.reduce((s, h) => s + Number(h.sisa), 0)
-  const totalCashIDR = rekening.filter(r => (r.mata_uang || 'IDR') === 'IDR').reduce((s, r) => s + Number(r.saldo), 0)
+  const totalCashIDR = rekening
+    .filter(r => (r.mata_uang || 'IDR') === 'IDR')
+    .reduce((s, r) => s + Number(r.saldo), 0)
 
   const perTicker = crypto.reduce((acc, c) => {
     const t = c.ticker.toUpperCase()
@@ -152,6 +107,51 @@ export default function Dashboard() {
   const nama = user?.user_metadata?.full_name?.split(' ')[0] || 'Angga'
   const jam = new Date().getHours()
   const sapa = jam < 11 ? 'Selamat pagi' : jam < 15 ? 'Selamat siang' : jam < 18 ? 'Selamat sore' : 'Selamat malam'
+
+  const css = `
+    @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap');
+    .vf-root { font-family: 'DM Sans', sans-serif; }
+    .vf-card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 20px;
+      padding: 20px;
+      margin-bottom: 14px;
+      backdrop-filter: blur(10px);
+      transition: border-color 0.2s, transform 0.2s;
+    }
+    .vf-card:hover { border-color: rgba(255,255,255,0.13); }
+    .vf-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      transition: background 0.15s;
+    }
+    .vf-row:last-child { border-bottom: none; }
+    .vf-row:hover { background: rgba(255,255,255,0.02); border-radius: 8px; padding-left: 6px; padding-right: 6px; }
+    .vf-kpi {
+      border-radius: 16px;
+      padding: 16px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s;
+    }
+    .vf-kpi:hover { transform: translateY(-2px); }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .vf-fadein { animation: fadeUp 0.4s ease forwards; }
+    .vf-fadein-1 { animation-delay: 0.05s; opacity: 0; }
+    .vf-fadein-2 { animation-delay: 0.1s; opacity: 0; }
+    .vf-fadein-3 { animation-delay: 0.15s; opacity: 0; }
+    .vf-fadein-4 { animation-delay: 0.2s; opacity: 0; }
+    .vf-fadein-5 { animation-delay: 0.25s; opacity: 0; }
+    .vf-fadein-6 { animation-delay: 0.3s; opacity: 0; }
+    .vf-fadein-7 { animation-delay: 0.35s; opacity: 0; }
+  `
 
   if (loading) return (
     <div style={{ display:'flex', height:'100vh', background:'#080c14', alignItems:'center', justifyContent:'center' }}>
@@ -215,10 +215,10 @@ export default function Dashboard() {
         {/* KPI GRID */}
         <div className="vf-fadein vf-fadein-3" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'16px' }}>
           {[
-            { label:'Rekening', value: fmtIDR(totalCashIDR), icon:'💳', bg:'#0a1628', border:'rgba(74,158,255,0.2)', color:'#4a9eff', glow:'rgba(74,158,255,0.1)' },
-            { label:'Crypto', value: fmtIDR(totalCryptoIDR), icon:'🪙', bg:'#180a28', border:'rgba(180,100,255,0.2)', color:'#b464ff', glow:'rgba(180,100,255,0.1)' },
-            { label:'Emas', value: fmtIDR(totalEmasSekarang), sub: `${untungRugiEmas >= 0 ? '▲' : '▼'} ${fmtIDR(Math.abs(untungRugiEmas))}`, subColor: untungRugiEmas >= 0 ? '#4cde8a' : '#ff6b6b', icon:'🥇', bg:'#1a1500', border:'rgba(245,200,66,0.2)', color:'#f5c842', glow:'rgba(245,200,66,0.1)' },
-            { label:'Hutang', value: fmtIDR(totalHutang), icon:'📉', bg:'#1a0808', border:'rgba(255,100,100,0.2)', color:'#ff6464', glow:'rgba(255,100,100,0.1)' },
+            { label:'Rekening', value: fmtIDR(totalCashIDR), icon:'💳', bg:'#0a1628', border:'rgba(74,158,255,0.2)', color:'#4a9eff' },
+            { label:'Crypto', value: fmtIDR(totalCryptoIDR), icon:'🪙', bg:'#180a28', border:'rgba(180,100,255,0.2)', color:'#b464ff' },
+            { label:'Emas', value: fmtIDR(totalEmasSekarang), sub: `${untungRugiEmas >= 0 ? '▲' : '▼'} ${fmtIDR(Math.abs(untungRugiEmas))}`, subColor: untungRugiEmas >= 0 ? '#4cde8a' : '#ff6b6b', icon:'🥇', bg:'#1a1500', border:'rgba(245,200,66,0.2)', color:'#f5c842' },
+            { label:'Hutang', value: fmtIDR(totalHutang), icon:'📉', bg:'#1a0808', border:'rgba(255,100,100,0.2)', color:'#ff6464' },
           ].map((k, i) => (
             <div key={i} className="vf-kpi" style={{ background: k.bg, border:`1px solid ${k.border}` }}>
               <div style={{ fontSize:'18px', marginBottom:'8px' }}>{k.icon}</div>
@@ -246,7 +246,7 @@ export default function Dashboard() {
                     <div style={{ fontSize:'10px', color:'#3a5a7a', marginTop:'1px' }}>{r.tipe}</div>
                   </div>
                   {r.mata_uang && r.mata_uang !== 'IDR' && (
-                    <span className="vf-badge" style={{ background:'rgba(255,183,77,0.1)', color:'#ffb74d', border:'1px solid rgba(255,183,77,0.2)' }}>
+                    <span style={{ fontSize:'10px', padding:'2px 6px', borderRadius:'20px', background:'rgba(255,183,77,0.1)', color:'#ffb74d', border:'1px solid rgba(255,183,77,0.2)' }}>
                       {r.mata_uang}
                     </span>
                   )}
