@@ -23,7 +23,7 @@ const NAV = [
   { to:'/emas', label:'Emas', icon:'🥇' },
   { to:'/cashflow', label:'Cashflow', icon:'💸' },
   { to:'/laporan', label:'Laporan', icon:'📑' },
-  { to:'/admin', label:'Admin', icon:'🔑' },
+  { to:'/admin', label:'Admin', icon:'🔑', adminOnly: true },
 ]
 
 const BOTTOM_NAV = [
@@ -39,7 +39,7 @@ const MORE_NAV = [
   { to:'/crypto', label:'Crypto', icon:'🪙' },
   { to:'/emas', label:'Emas', icon:'🥇' },
   { to:'/laporan', label:'Laporan PDF', icon:'📑' },
-  { to:'/admin', label:'Admin Panel', icon:'🔑' },
+  { to:'/admin', label:'Admin Panel', icon:'🔑', adminOnly: true },
 ]
 
 const css = `
@@ -250,8 +250,9 @@ const css = `
   }
 `
 
-const Sidebar = ({ user, onLogout }) => {
+const Sidebar = ({ user, onLogout, isAdmin }) => {
   const loc = useLocation()
+  const filteredNav = NAV.filter(item => !item.adminOnly || isAdmin)
   return (
     <div className="vf-sidebar">
       <div className="vf-sidebar-header">
@@ -262,7 +263,7 @@ const Sidebar = ({ user, onLogout }) => {
         </div>
       </div>
       <nav className="vf-nav">
-        {NAV.map(item => {
+        {filteredNav.map(item => {
           const active = loc.pathname === item.to
           return (
             <Link key={item.to} to={item.to} className={`vf-nav-item${active?' active':''}`}>
@@ -313,14 +314,15 @@ const BottomNav = ({ onMoreClick }) => {
   )
 }
 
-const MoreSheet = ({ onClose, onLogout, user }) => {
+const MoreSheet = ({ onClose, onLogout, user, isAdmin }) => {
   const loc = useLocation()
+  const filteredMore = MORE_NAV.filter(item => !item.adminOnly || isAdmin)
   return (
     <>
       <div className="vf-more-overlay" onClick={onClose} />
       <div className="vf-more-sheet">
         <div className="vf-more-sheet-title">MENU LAINNYA</div>
-        {MORE_NAV.map(item => (
+        {filteredMore.map(item => (
           <Link key={item.to} to={item.to} className={`vf-more-item${loc.pathname===item.to?' active':''}`} onClick={onClose}>
             <span className="vf-more-icon">{item.icon}</span>
             {item.label}
@@ -341,13 +343,24 @@ const MoreSheet = ({ onClose, onLogout, user }) => {
 export default function App() {
   const [user, setUser] = useState(undefined)
   const [showMore, setShowMore] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  const checkAdmin = async (userId) => {
+    if (!userId) { setIsAdmin(false); return }
+    const { data } = await supabase.from('admins').select('user_id').eq('user_id', userId)
+    setIsAdmin(data && data.length > 0)
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
+      checkAdmin(session?.user?.id)
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => setUser(session?.user ?? null)
+      (_event, session) => {
+        setUser(session?.user ?? null)
+        checkAdmin(session?.user?.id)
+      }
     )
     return () => subscription.unsubscribe()
   }, [])
@@ -355,6 +368,7 @@ export default function App() {
   const logout = async () => {
     await supabase.auth.signOut()
     setUser(null)
+    setIsAdmin(false)
   }
 
   if (user === undefined) return (
@@ -370,7 +384,7 @@ export default function App() {
     <>
       <style>{css}</style>
       <div style={{ display:'flex', height:'100vh', background:'#080c14' }}>
-        <Sidebar user={user} onLogout={logout} />
+        <Sidebar user={user} onLogout={logout} isAdmin={isAdmin} />
         <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
           <MobileHeader user={user} onMoreClick={() => setShowMore(true)} />
           <main className="vf-main-content" style={{ flex:1, overflowY:'auto' }}>
@@ -378,7 +392,7 @@ export default function App() {
           </main>
         </div>
         <BottomNav onMoreClick={() => setShowMore(true)} />
-        {showMore && <MoreSheet onClose={() => setShowMore(false)} onLogout={logout} user={user} />}
+        {showMore && <MoreSheet onClose={() => setShowMore(false)} onLogout={logout} user={user} isAdmin={isAdmin} />}
       </div>
     </>
   )
