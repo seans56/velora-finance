@@ -10,6 +10,7 @@ import Cashflow from './pages/Cashflow'
 import History from './pages/History'
 import Crypto from './pages/Crypto'
 import Emas from './pages/Emas'
+import LaporanPDF from './pages/LaporanPDF'
 
 const NAV = [
   { to:'/dashboard', label:'Dashboard', icon:'📊' },
@@ -20,9 +21,9 @@ const NAV = [
   { to:'/crypto', label:'Crypto', icon:'🪙' },
   { to:'/emas', label:'Emas', icon:'🥇' },
   { to:'/cashflow', label:'Cashflow', icon:'💸' },
+  { to:'/laporan', label:'Laporan', icon:'📑' },
 ]
 
-// Bottom nav hanya tampilkan 5 item utama, sisanya di "More"
 const BOTTOM_NAV = [
   { to:'/dashboard', label:'Home', icon:'📊' },
   { to:'/rekening', label:'Wallet', icon:'💳' },
@@ -35,6 +36,7 @@ const MORE_NAV = [
   { to:'/saham', label:'Saham', icon:'📈' },
   { to:'/crypto', label:'Crypto', icon:'🪙' },
   { to:'/emas', label:'Emas', icon:'🥇' },
+  { to:'/laporan', label:'Laporan PDF', icon:'📑' },
 ]
 
 const css = `
@@ -42,7 +44,6 @@ const css = `
   * { box-sizing: border-box; }
   body { margin: 0; background: #080c14; }
 
-  /* SIDEBAR - Desktop */
   .vf-sidebar {
     width: 200px;
     background: #080c14;
@@ -112,7 +113,6 @@ const css = `
   .vf-sidebar-footer { padding: 12px; border-top: 1px solid rgba(255,255,255,0.06); }
   .vf-dot { width: 6px; height: 6px; border-radius: 50%; background: #4cde8a; display: inline-block; margin-right: 6px; box-shadow: 0 0 6px #4cde8a; }
 
-  /* BOTTOM NAV - Mobile */
   .vf-bottom-nav {
     display: none;
     position: fixed;
@@ -154,7 +154,6 @@ const css = `
   }
   .vf-bottom-nav-item.active .bn-dot { opacity: 1; }
 
-  /* MOBILE HEADER */
   .vf-mobile-header {
     display: none;
     position: sticky;
@@ -174,7 +173,6 @@ const css = `
     color: #f5c842;
   }
 
-  /* MORE SHEET */
   .vf-more-overlay {
     position: fixed;
     inset: 0;
@@ -236,7 +234,6 @@ const css = `
   }
   .vf-more-logout:hover { background: rgba(255,100,100,0.15); }
 
-  /* RESPONSIVE */
   @media (max-width: 768px) {
     .vf-sidebar { display: none !important; }
     .vf-bottom-nav { display: block !important; }
@@ -395,6 +392,7 @@ export default function App() {
         <Route path='/crypto' element={user ? <Layout><Crypto /></Layout> : <Navigate to='/login' />} />
         <Route path='/emas' element={user ? <Layout><Emas /></Layout> : <Navigate to='/login' />} />
         <Route path='/cashflow' element={user ? <Layout><Cashflow /></Layout> : <Navigate to='/login' />} />
+        <Route path='/laporan' element={user ? <Layout><LaporanPDF /></Layout> : <Navigate to='/login' />} />
         <Route path='*' element={<Navigate to={user ? '/dashboard' : '/login'} />} />
       </Routes>
     </BrowserRouter>
